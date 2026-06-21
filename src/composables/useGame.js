@@ -10,6 +10,9 @@ import {
   calcProfit,
   calcTraineeScore,
   getRelationship,
+  toggleFocusTrainee,
+  setPersonalPlan,
+  getFocusedCount,
 } from '../utils/gameLogic'
 import { saveToSlot } from '../utils/storage'
 
@@ -24,6 +27,9 @@ export function useGame() {
   )
   const activeTrainees = computed(() =>
     state.value ? state.value.trainees.filter((t) => t.status !== 'left') : []
+  )
+  const focusedCount = computed(() =>
+    state.value ? getFocusedCount(state.value) : 0
   )
 
   function startNewGame(slotIndex) {
@@ -112,6 +118,18 @@ export function useGame() {
     return getRelationship(state.value.relationships, idA, idB)
   }
 
+  function toggleFocus(traineeId) {
+    if (!state.value) return
+    state.value = toggleFocusTrainee(state.value, traineeId)
+    autoSave()
+  }
+
+  function updatePlan(traineeId, targetStat, targetValue) {
+    if (!state.value) return
+    state.value = setPersonalPlan(state.value, traineeId, targetStat, targetValue)
+    autoSave()
+  }
+
   return {
     state,
     currentSlot,
@@ -119,6 +137,7 @@ export function useGame() {
     profit,
     daysLeft,
     activeTrainees,
+    focusedCount,
     startNewGame,
     loadGame,
     setSchedule,
@@ -134,5 +153,7 @@ export function useGame() {
     getRatingResults: () => (state.value ? getRatingResults(state.value) : []),
     calcTraineeScore,
     autoSave,
+    toggleFocus,
+    updatePlan,
   }
 }

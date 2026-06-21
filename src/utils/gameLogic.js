@@ -32,6 +32,10 @@ function createTrainee(name, index) {
   for (const key of CFG.stats) {
     stats[key] = randInt(CFG.initial.statMin, CFG.initial.statMax)
   }
+  const highestStat = CFG.stats.reduce(
+    (a, b) => (stats[a] >= stats[b] ? a : b),
+    CFG.stats[0]
+  )
   return {
     id: `t${index}_${Date.now()}`,
     name,
@@ -44,6 +48,13 @@ function createTrainee(name, index) {
     poachResist: randInt(40, 70),
     fans: 0,
     singlesReleased: 0,
+    isFocused: false,
+    personalPlan: {
+      targetStat: highestStat,
+      targetValue: 70,
+      achievedMilestones: [],
+      notifiedMilestones: [],
+    },
   }
 }
 
@@ -133,6 +144,9 @@ function getTrainingMultiplier(trainee, partners, relationships) {
   if (synergyCount > 0) {
     mult *= 1 + CFG.relationships.synergyBonus * Math.min(synergyCount, 2)
   }
+  if (trainee.isFocused) {
+    mult *= CFG.focus.trainingMultiplier
+  }
   return mult
 }
 
@@ -202,8 +216,15 @@ export function processDay(state) {
       )
     }
 
-    trainee.fatigue = clamp(applyRange(trainee.fatigue, activity.fatigue), 0, 100)
-    trainee.stress = clamp(applyRange(trainee.stress, activity.stress), 0, 100)
+    const focusMult = trainee.isFocused ? CFG.focus.trainingMultiplier : 1
+    const fatigueRange = activity.fatigue.map((v) =>
+      v > 0 ? Math.round(v * (trainee.isFocused ? CFG.focus.fatigueMultiplier : 1)) : v
+    )
+    const stressRange = activity.stress.map((v) =>
+      v > 0 ? Math.round(v * (trainee.isFocused ? CFG.focus.stressMultiplier : 1)) : v
+    )
+    trainee.fatigue = clamp(applyRange(trainee.fatigue, fatigueRange), 0, 100)
+    trainee.stress = clamp(applyRange(trainee.stress, stressRange), 0, 100)
 
     if (activity.fansGain) {
       const gained = randInt(activity.fansGain[0], activity.fansGain[1])
@@ -308,6 +329,37 @@ export function processDay(state) {
         text: `【${pendingEvent.label}】${pendingEvent.target.name} 需要休养 ${pendingEvent.duration} 天。`,
       })
       pendingEvent = null
+    }
+  }
+
+  for (const trainee of trainees) {
+    if (trainee.status === 'left') continue
+    const plan = trainee.personalPlan
+    if (!plan) continue
+
+    const milestones = CFG.personalPlan.milestones
+    for (let i = 0; i < milestones.length; i++) {
+      const ms = milestones[i]
+      if (plan.achievedMilestones.includes(ms.label)) continue
+
+      const statValue = trainee.stats[plan.targetStat]
+      if (statValue >= ms.statTarget) {
+        plan.achievedMilestones.push(ms.label)
+        money += CFG.personalPlan.rewardMoney
+        totalExpenses -= 0
+        const traineeFans = CFG.personalPlan.rewardFans
+        trainee.fans += traineeFans
+        fans += traineeFans
+        trainee.stats[plan.targetStat] = clamp(
+          trainee.stats[plan.targetStat] + CFG.personalPlan.rewardStatBoost,
+          0,
+          CFG.thresholds.statCap
+        )
+        logs.push({
+          day: state.day,
+          text: `🏆【${ms.reward}】${trainee.name} 的${CFG.statLabels[plan.targetStat]}达成 ${ms.label}（${ms.statTarget}）！奖励 ¥${CFG.personalPlan.rewardMoney}、粉丝 +${traineeFans}、${CFG.statLabels[plan.targetStat]} +${CFG.personalPlan.rewardStatBoost}！`,
+        })
+      }
     }
   }
 
@@ -554,4 +606,62 @@ export function getRatingResults(state) {
       canDebut: calcTraineeScore(t) >= CFG.rating.debutScoreThreshold,
     }))
     .sort((a, b) => b.score - a.score)
+}
+
+export function toggleFocusTrainee(state, traineeId) {
+  const trainees = state.trainees.map((t) => ({ ...t, personalPlan: { ...t.personalPlan } }))
+  const target = trainees.find((t) => t.id === traineeId)
+  if (!target || target.status === 'left') return state
+
+  if (target.isFocused) {
+    target.isFocused = false
+  } else {
+    const focusedCount = trainees.filter((t) => t.isFocused).length
+    if (focusedCount >= CFG.focus.maxFocusCount) {
+      for (const t of trainees) {
+        if (t.isFocused) {
+          t.isFocused = false
+          break
+        }
+      }
+    }
+    target.isFocused = true
+  }
+  return { ...state, trainees }
+}
+
+export function setPersonalPlan(state, traineeId, targetStat, targetValue) {
+  const trainees = state.trainees.map((t) => ({
+    ...t,
+    personalPlan: {
+      ...t.personalPlan,
+      achievedMilestones: [...(t.personalPlan?.achievedMilestones || [])],
+      notifiedMilestones: [...(t.personalPlan?.notifiedMilestones || [])],
+    },
+  }))
+  const target = trainees.find((t) => t.id === traineeId)
+  if (!target || target.status === 'left') return state
+
+  const validStats = CFG.stats
+  if (!validStats.includes(targetStat)) return state
+
+  const milestones = CFG.personalPlan.milestones
+  const achieved = []
+  for (const ms of milestones) {
+    if (target.stats[targetStat] >= ms.statTarget) {
+      achieved.push(ms.label)
+    }
+  }
+
+  target.personalPlan = {
+    targetStat,
+    targetValue: clamp(targetValue, 30, CFG.thresholds.statCap),
+    achievedMilestones: achieved,
+    notifiedMilestones: achieved,
+  }
+  return { ...state, trainees }
+}
+
+export function getFocusedCount(state) {
+  return state.trainees.filter((t) => t.isFocused && t.status !== 'left').length
 }

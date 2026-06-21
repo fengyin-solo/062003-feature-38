@@ -18,6 +18,7 @@
     :can-end-day="canEndDay()"
     :rating-results="getRatingResults()"
     :calc-score="calcTraineeScore"
+    :focused-count="focusedCount"
     @back="backToMenu"
     @toggle-theme="toggleTheme"
     @set-schedule="setSchedule"
@@ -27,6 +28,8 @@
     @debut="onDebut"
     @resolve-poaching="handlePoaching"
     @release-single="onReleaseSingle"
+    @toggle-focus="toggleFocus"
+    @update-plan="updatePlan"
   />
 </template>
 
@@ -47,6 +50,7 @@ const {
   profit,
   daysLeft,
   activeTrainees,
+  focusedCount,
   startNewGame,
   loadGame,
   setSchedule,
@@ -60,6 +64,8 @@ const {
   backToMenu,
   getRatingResults,
   calcTraineeScore,
+  toggleFocus,
+  updatePlan,
 } = useGame()
 
 onMounted(() => {

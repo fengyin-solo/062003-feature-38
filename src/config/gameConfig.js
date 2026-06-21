@@ -194,6 +194,27 @@ export const GAME_CONFIG = {
     '方念慈', '宋时雨', '叶知秋', '周慕青', '赵星河',
   ],
 
+  // ── 重点培养 ──
+  focus: {
+    trainingMultiplier: 1.35,     // 重点培养训练加成
+    fatigueMultiplier: 1.15,      // 重点培养疲劳额外消耗
+    stressMultiplier: 1.2,        // 重点培养压力额外消耗
+    maxFocusCount: 1,             // 同时最多重点培养人数
+  },
+
+  // ── 专属计划 ──
+  personalPlan: {
+    rewardMoney: 5000,            // 达成奖励金
+    rewardFans: 200,              // 达成额外粉丝
+    rewardStatBoost: 3,           // 达成额外属性提升
+    milestones: [
+      { label: '起步期', statTarget: 50, reward: '潜力认可' },
+      { label: '成长期', statTarget: 70, reward: '崭露头角' },
+      { label: '成熟期', statTarget: 85, reward: '未来之星' },
+      { label: '巅峰期', statTarget: 95, reward: '预备王牌' },
+    ],
+  },
+
   // ── 存档 ──
   storage: {
     savesKey: 'idol-agency-saves-v1',
